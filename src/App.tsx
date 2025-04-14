@@ -13,6 +13,8 @@ import Deliveries from "./pages/Deliveries";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import Settings from "./pages/Settings";
+import InvoiceRouting from "./pages/InvoiceRouting";
 
 const queryClient = new QueryClient();
 
@@ -33,6 +35,8 @@ const App = () => (
           <Route path="/deliveries" element={<Deliveries />} />
           <Route path="/deliveries/completed" element={<Deliveries />} />
           <Route path="/deliveries/issues" element={<Deliveries />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/invoice-routing" element={<InvoiceRouting />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

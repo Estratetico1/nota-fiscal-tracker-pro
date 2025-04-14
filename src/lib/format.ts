@@ -5,7 +5,7 @@ export const formatCurrency = (value: number): string => {
     currency: 'BRL',
     currencyDisplay: 'symbol',
     minimumFractionDigits: 2
-  }).format(value);
+  }).format(value).replace('BRL', 'R$');
 };
 
 export const formatDate = (date: string | Date): string => {

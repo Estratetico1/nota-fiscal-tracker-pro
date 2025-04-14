@@ -6,9 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { Search, CalendarIcon, ArrowUpDown, Eye, Banknote, AlertCircle, Download } from "lucide-react";
+import { Search, CalendarIcon, ArrowUpDown, Eye, Banknote, AlertCircle, Download, Mail } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,6 +17,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "@/components/ui/sonner";
+import { useNavigate } from "react-router-dom";
 
 const invoicesData = [
   {
@@ -84,6 +85,8 @@ const getStatusBadge = (status: string) => {
 };
 
 const Financial = () => {
+  const navigate = useNavigate();
+  
   // Calculate summary values
   const totalPending = invoicesData.filter(inv => inv.status === "pending").reduce((sum, inv) => sum + inv.value, 0);
   const pendingCount = invoicesData.filter(inv => inv.status === "pending").length;
@@ -94,10 +97,52 @@ const Financial = () => {
   const totalOverdue = invoicesData.filter(inv => inv.status === "overdue").reduce((sum, inv) => sum + inv.value, 0);
   const overdueCount = invoicesData.filter(inv => inv.status === "overdue").length;
 
+  const [selectedStatus, setSelectedStatus] = React.useState("");
+
+  // Filter invoices based on the selected status
+  const filteredInvoices = selectedStatus 
+    ? invoicesData.filter(invoice => invoice.status === selectedStatus)
+    : invoicesData;
+
+  const handleSendPaymentReminder = (invoiceId: string) => {
+    // In a real application, this would send an API request to send an email
+    const invoice = invoicesData.find(inv => inv.id === invoiceId);
+    toast.success(`Lembrete de pagamento enviado para ${invoice?.client}`, {
+      description: `Referente à fatura ${invoice?.invoiceNumber}`,
+      duration: 5000,
+    });
+  };
+
+  const handleSendAllReminders = () => {
+    const overdueInvoices = invoicesData.filter(inv => inv.status === "overdue");
+    toast.success(`Lembretes enviados para ${overdueInvoices.length} clientes inadimplentes`, {
+      description: "Todos os clientes com faturas vencidas foram notificados.",
+      duration: 5000,
+    });
+  };
+
+  const handleGoToConfig = () => {
+    navigate("/settings");
+  };
+
+  const handleGoToRouting = () => {
+    navigate("/invoice-routing");
+  };
+
   return (
     <MainLayout>
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold">Financeiro</h1>
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold">Financeiro</h1>
+          <div className="flex space-x-2">
+            <Button variant="outline" onClick={handleGoToConfig}>
+              Configurações
+            </Button>
+            <Button variant="outline" onClick={handleGoToRouting}>
+              Roteirização
+            </Button>
+          </div>
+        </div>
         
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -121,6 +166,12 @@ const Financial = () => {
             icon={<AlertCircle className="h-6 w-6" />}
             variant="red"
             trend={{ value: 3, isPositive: false }}
+            action={
+              <Button size="sm" variant="destructive" className="ml-auto" onClick={handleSendAllReminders}>
+                <Mail className="h-4 w-4 mr-1" />
+                Enviar Cobrança
+              </Button>
+            }
           />
         </div>
         
@@ -139,7 +190,11 @@ const Financial = () => {
                 <Input type="date" placeholder="Data de vencimento" className="w-full" />
               </div>
               <div>
-                <select className="w-full h-10 px-3 rounded-md border border-input bg-background">
+                <select 
+                  className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                  value={selectedStatus}
+                  onChange={(e) => setSelectedStatus(e.target.value)}
+                >
                   <option value="">Todos os status</option>
                   <option value="pending">A Receber</option>
                   <option value="paid">Recebido</option>
@@ -172,35 +227,55 @@ const Financial = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {invoicesData.map((invoice) => (
-                    <TableRow key={invoice.id}>
+                  {filteredInvoices.map((invoice) => (
+                    <TableRow 
+                      key={invoice.id}
+                      className={invoice.status === "overdue" ? "bg-red-50" : ""} // Highlight overdue rows
+                    >
                       <TableCell className="font-medium">{invoice.client}</TableCell>
                       <TableCell>{invoice.invoiceNumber}</TableCell>
                       <TableCell>{formatCurrency(invoice.value)}</TableCell>
                       <TableCell>{formatDate(invoice.dueDate)}</TableCell>
                       <TableCell>{getStatusBadge(invoice.status)}</TableCell>
                       <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              Ações
+                        <div className="flex space-x-1">
+                          {invoice.status === "overdue" && (
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleSendPaymentReminder(invoice.id)}
+                            >
+                              <Mail className="h-4 w-4" />
                             </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                              <Eye className="mr-2 h-4 w-4" />
-                              Ver detalhes
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Banknote className="mr-2 h-4 w-4" />
-                              {invoice.status === "paid" ? "Estornar" : "Marcar como pago"}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Download className="mr-2 h-4 w-4" />
-                              Baixar boleto
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                          )}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                Ações
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Ver detalhes
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Banknote className="mr-2 h-4 w-4" />
+                                {invoice.status === "paid" ? "Estornar" : "Marcar como pago"}
+                              </DropdownMenuItem>
+                              {invoice.status === "overdue" && (
+                                <DropdownMenuItem onClick={() => handleSendPaymentReminder(invoice.id)}>
+                                  <Mail className="mr-2 h-4 w-4" />
+                                  Enviar cobrança
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem>
+                                <Download className="mr-2 h-4 w-4" />
+                                Baixar boleto
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
