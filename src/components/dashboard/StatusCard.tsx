@@ -12,6 +12,7 @@ interface StatusCardProps {
     isPositive: boolean;
   };
   variant?: 'default' | 'teal' | 'orange' | 'gray' | 'blue' | 'red' | 'yellow';
+  action?: ReactNode;
 }
 
 export const StatusCard: React.FC<StatusCardProps> = ({
@@ -19,7 +20,8 @@ export const StatusCard: React.FC<StatusCardProps> = ({
   value,
   icon,
   trend,
-  variant = 'default'
+  variant = 'default',
+  action
 }) => {
   const variants = {
     default: 'bg-white',
@@ -69,6 +71,12 @@ export const StatusCard: React.FC<StatusCardProps> = ({
             {icon}
           </div>
         </div>
+        
+        {action && (
+          <div className="mt-4">
+            {action}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
