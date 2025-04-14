@@ -11,7 +11,7 @@ interface StatusCardProps {
     value: number;
     isPositive: boolean;
   };
-  variant?: 'default' | 'teal' | 'orange' | 'gray';
+  variant?: 'default' | 'teal' | 'orange' | 'gray' | 'blue' | 'red' | 'yellow';
 }
 
 export const StatusCard: React.FC<StatusCardProps> = ({
@@ -25,7 +25,20 @@ export const StatusCard: React.FC<StatusCardProps> = ({
     default: 'bg-white',
     teal: 'bg-teal-50 border-teal-100',
     orange: 'bg-orange-50 border-orange-100',
-    gray: 'bg-gray-50 border-gray-100'
+    gray: 'bg-gray-50 border-gray-100',
+    blue: 'bg-blue-50 border-blue-100',
+    red: 'bg-red-50 border-red-100',
+    yellow: 'bg-yellow-50 border-yellow-100'
+  };
+  
+  const iconBackground = {
+    default: "bg-gray-100 text-gray-700",
+    teal: "bg-teal-100 text-teal-700",
+    orange: "bg-orange-100 text-orange-700",
+    gray: "bg-gray-200 text-gray-700",
+    blue: "bg-blue-100 text-blue-700",
+    red: "bg-red-100 text-red-700",
+    yellow: "bg-yellow-100 text-yellow-700"
   };
   
   return (
@@ -51,9 +64,7 @@ export const StatusCard: React.FC<StatusCardProps> = ({
           
           <div className={cn(
             "p-3 rounded-md",
-            variant === 'teal' ? "bg-teal-100 text-teal-700" :
-            variant === 'orange' ? "bg-orange-100 text-orange-700" :
-            "bg-gray-100 text-gray-700"
+            iconBackground[variant]
           )}>
             {icon}
           </div>

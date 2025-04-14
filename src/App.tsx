@@ -8,6 +8,8 @@ import Dashboard from "./pages/Dashboard";
 import InvoiceList from "./pages/InvoiceList";
 import InvoiceDetail from "./pages/InvoiceDetail";
 import ImportInvoice from "./pages/ImportInvoice";
+import Financial from "./pages/Financial";
+import Deliveries from "./pages/Deliveries";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -27,6 +29,10 @@ const App = () => (
           <Route path="/invoices" element={<InvoiceList />} />
           <Route path="/invoices/:id" element={<InvoiceDetail />} />
           <Route path="/import" element={<ImportInvoice />} />
+          <Route path="/financial" element={<Financial />} />
+          <Route path="/deliveries" element={<Deliveries />} />
+          <Route path="/deliveries/completed" element={<Deliveries />} />
+          <Route path="/deliveries/issues" element={<Deliveries />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
