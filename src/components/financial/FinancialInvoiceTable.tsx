@@ -12,16 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { InvoiceStatus } from "@/pages/Financial";
-
-interface Invoice {
-  id: string;
-  client: string;
-  invoiceNumber: string;
-  value: number;
-  dueDate: string;
-  status: InvoiceStatus;
-}
+import { Invoice, InvoiceStatus } from "@/types/financial";
 
 interface FinancialInvoiceTableProps {
   invoices: Invoice[];

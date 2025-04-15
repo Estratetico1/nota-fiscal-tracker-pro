@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search } from "lucide-react";
-import { InvoiceStatus } from "@/pages/Financial";
+import { InvoiceStatus } from "@/types/financial";
 
 interface FinancialFiltersProps {
   selectedStatus: InvoiceStatus | "";
