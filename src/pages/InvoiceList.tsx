@@ -19,6 +19,7 @@ interface Invoice {
   id: string;
   number: string;
   client: string;
+  clientCNPJ: string;
   issueDate: string;
   dueDate: string;
   value: number;
@@ -28,6 +29,7 @@ interface Invoice {
 
 const InvoiceList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [searchType, setSearchType] = useState("all");
   const [deliveryStatus, setDeliveryStatus] = useState("all");
   const [paymentStatus, setPaymentStatus] = useState("all");
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -47,6 +49,8 @@ const InvoiceList: React.FC = () => {
           toast.error("Erro ao carregar notas fiscais");
           return;
         }
+
+        console.log("Dados brutos de notas fiscais:", notasFiscais);
 
         // Mapear os dados para o formato de Invoice
         const mappedInvoices: Invoice[] = (notasFiscais || []).map((nota: any) => {
@@ -79,6 +83,7 @@ const InvoiceList: React.FC = () => {
             id: String(nota.id),
             number: nota.numero_nf ? `NF-e ${nota.numero_nf}` : "Sem número",
             client: nota.cliente || "Cliente não especificado",
+            clientCNPJ: nota.cod_cliente || "",
             issueDate: nota.data_emissao || "-",
             dueDate: nota.data_emissao ? new Date(new Date(nota.data_emissao).getTime() + 30*24*60*60*1000).toISOString().split('T')[0] : "-",
             value: Number(nota.valor_total) || 0,
@@ -102,9 +107,22 @@ const InvoiceList: React.FC = () => {
 
   // Filtragem de notas fiscais
   const filteredInvoices = invoices.filter(invoice => {
-    const matchesSearch = searchTerm === "" || 
-      invoice.client.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      invoice.number.toLowerCase().includes(searchTerm.toLowerCase());
+    // Filtragem por termo de busca baseado no tipo de busca selecionado
+    let matchesSearch = true;
+    if (searchTerm !== "") {
+      if (searchType === "all") {
+        matchesSearch = 
+          invoice.client.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          invoice.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          invoice.clientCNPJ.toLowerCase().includes(searchTerm.toLowerCase());
+      } else if (searchType === "number") {
+        matchesSearch = invoice.number.toLowerCase().includes(searchTerm.toLowerCase());
+      } else if (searchType === "cnpj") {
+        matchesSearch = invoice.clientCNPJ.toLowerCase().includes(searchTerm.toLowerCase());
+      } else if (searchType === "client") {
+        matchesSearch = invoice.client.toLowerCase().includes(searchTerm.toLowerCase());
+      }
+    }
     
     const matchesDeliveryStatus = deliveryStatus === "all" || invoice.status === deliveryStatus;
     const matchesPaymentStatus = paymentStatus === "all" || invoice.paymentStatus === paymentStatus;
@@ -138,12 +156,28 @@ const InvoiceList: React.FC = () => {
 
         <Card>
           <CardContent className="p-4">
-            <div className="grid gap-4 md:grid-cols-4 mb-6">
+            <div className="grid gap-4 md:grid-cols-5 mb-6">
+              <div className="md:col-span-1">
+                <Select value={searchType} onValueChange={setSearchType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Buscar por..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="number">Número da NF</SelectItem>
+                    <SelectItem value="cnpj">CNPJ</SelectItem>
+                    <SelectItem value="client">Nome do Cliente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="md:col-span-2">
                 <div className="relative">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
                   <Input
-                    placeholder="Pesquisar notas fiscais..."
+                    placeholder={searchType === "number" ? "Buscar por número de nota..." : 
+                                searchType === "cnpj" ? "Buscar por CNPJ..." : 
+                                searchType === "client" ? "Buscar por cliente..." :
+                                "Buscar notas fiscais..."}
                     className="pl-8"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -177,7 +211,7 @@ const InvoiceList: React.FC = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="md:col-span-4 flex justify-end">
+              <div className="md:col-span-5 flex justify-end">
                 <Button variant="outline" size="sm">
                   <Filter className="h-4 w-4 mr-2" />
                   Filtros Avançados

@@ -22,31 +22,55 @@ interface Invoice {
 }
 
 // Função para mapear os dados do Supabase para o formato de Invoice
-const mapSupabaseToInvoice = (item: any): Invoice => {
+const mapSupabaseToInvoice = (item: any, source: 'contas_receber' | 'notas_fiscais'): Invoice => {
   // Determina o status com base na data de vencimento e quitação
   let status: InvoiceStatus = "pending";
   const currentDate = new Date();
-  const dueDate = item.data_vencimento ? new Date(item.data_vencimento) : null;
   
-  if (item.data_quitacao) {
-    status = "paid";
-  } else if (dueDate && dueDate < currentDate) {
-    status = "overdue";
+  if (source === 'contas_receber') {
+    const dueDate = item.data_vencimento ? new Date(item.data_vencimento) : null;
+    
+    if (item.data_quitacao) {
+      status = "paid";
+    } else if (dueDate && dueDate < currentDate) {
+      status = "overdue";
+    }
+    
+    return {
+      id: String(item.sequencial_cr || `CR${Math.floor(Math.random() * 10000)}`),
+      client: item.nome_fornecedor || "Fornecedor não especificado",
+      invoiceNumber: item.num_nf ? `NF-e ${item.num_nf}` : "Sem número",
+      value: Number(item.valor_parcela) || 0,
+      dueDate: item.data_vencimento || new Date().toISOString().split('T')[0],
+      status: status
+    };
+  } else {
+    // Para notas_fiscais, calculamos o vencimento como emissão + 30 dias
+    const issueDate = item.data_emissao ? new Date(item.data_emissao) : null;
+    const dueDate = issueDate ? new Date(issueDate.getTime() + 30*24*60*60*1000) : null;
+    
+    if (dueDate && dueDate < currentDate) {
+      status = "overdue";
+    } else if (issueDate && currentDate.getTime() - issueDate.getTime() > 15*24*60*60*1000) {
+      status = "paid";
+    }
+    
+    return {
+      id: String(item.id || `NF${Math.floor(Math.random() * 10000)}`),
+      client: item.cliente || "Cliente não especificado",
+      invoiceNumber: item.numero_nf ? `NF-e ${item.numero_nf}` : "Sem número",
+      value: Number(item.valor_total) || 0,
+      dueDate: dueDate ? dueDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      status: status
+    };
   }
-  
-  return {
-    id: String(item.sequencial_cr || item.id || `INV${Math.floor(Math.random() * 10000)}`),
-    client: item.nome_fornecedor || item.cliente || "Cliente não especificado",
-    invoiceNumber: item.num_nf ? `NF-e ${item.num_nf}` : item.numero_nf ? `NF-e ${item.numero_nf}` : "Sem número",
-    value: Number(item.valor_parcela || item.valor_total) || 0,
-    dueDate: item.data_vencimento || new Date().toISOString().split('T')[0],
-    status: status
-  };
 };
 
 const Financial = () => {
   const navigate = useNavigate();
   const [selectedStatus, setSelectedStatus] = useState<InvoiceStatus | "">("");
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [filterDueDate, setFilterDueDate] = useState<string>("");
   const [invoicesData, setInvoicesData] = useState<Invoice[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   
@@ -69,37 +93,11 @@ const Financial = () => {
           });
         } else if (contasReceberData) {
           // Converter os dados para o formato de Invoice
-          const mappedContasReceber = contasReceberData.map(mapSupabaseToInvoice);
+          const mappedContasReceber = contasReceberData.map(item => mapSupabaseToInvoice(item, 'contas_receber'));
           allInvoices = [...allInvoices, ...mappedContasReceber];
           console.log("Dados de contas a receber carregados:", mappedContasReceber.length);
         }
-
-        // Buscar dados de notas_fiscais
-        const { data: notasFiscaisData, error: notasFiscaisError } = await supabase
-          .from("notas_fiscais")
-          .select("*");
         
-        if (notasFiscaisError) {
-          console.error("Erro ao buscar notas fiscais:", notasFiscaisError);
-          toast.error("Erro ao carregar notas fiscais", {
-            description: "Não foi possível conectar ao banco de dados."
-          });
-        } else if (notasFiscaisData) {
-          // Verificar quais notas fiscais já existem em contas_receber para evitar duplicidade
-          const existingInvoiceNumbers = new Set(allInvoices.map(inv => inv.invoiceNumber.replace('NF-e ', '')));
-          
-          // Filtrar apenas notas que ainda não estão em contas_receber
-          const uniqueNotasFiscais = notasFiscaisData.filter(nota => {
-            const notaNumber = nota.numero_nf || '';
-            return !existingInvoiceNumbers.has(notaNumber);
-          });
-          
-          // Converter os dados para o formato de Invoice
-          const mappedNotasFiscais = uniqueNotasFiscais.map(mapSupabaseToInvoice);
-          allInvoices = [...allInvoices, ...mappedNotasFiscais];
-          console.log("Dados de notas fiscais carregados:", mappedNotasFiscais.length);
-        }
-
         // Atualizar o estado com todos os dados combinados
         setInvoicesData(allInvoices);
         console.log("Total de faturas carregadas:", allInvoices.length);
@@ -116,20 +114,31 @@ const Financial = () => {
     fetchData();
   }, []);
   
+  // Filtragem de faturas
+  const filteredInvoices = invoicesData.filter(invoice => {
+    // Filtrar por status
+    const statusFilter = selectedStatus === "" || invoice.status === selectedStatus;
+    
+    // Filtrar por termo de busca (cliente ou número da fatura)
+    const searchFilter = searchTerm === "" || 
+      invoice.client.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    // Filtrar por data de vencimento
+    const dateFilter = filterDueDate === "" || invoice.dueDate === filterDueDate;
+    
+    return statusFilter && searchFilter && dateFilter;
+  });
+  
   // Calcula os valores de resumo
-  const totalPending = invoicesData.filter(inv => inv.status === "pending").reduce((sum, inv) => sum + inv.value, 0);
-  const pendingCount = invoicesData.filter(inv => inv.status === "pending").length;
+  const totalPending = filteredInvoices.filter(inv => inv.status === "pending").reduce((sum, inv) => sum + inv.value, 0);
+  const pendingCount = filteredInvoices.filter(inv => inv.status === "pending").length;
   
-  const totalPaid = invoicesData.filter(inv => inv.status === "paid").reduce((sum, inv) => sum + inv.value, 0);
-  const paidCount = invoicesData.filter(inv => inv.status === "paid").length;
+  const totalPaid = filteredInvoices.filter(inv => inv.status === "paid").reduce((sum, inv) => sum + inv.value, 0);
+  const paidCount = filteredInvoices.filter(inv => inv.status === "paid").length;
   
-  const totalOverdue = invoicesData.filter(inv => inv.status === "overdue").reduce((sum, inv) => sum + inv.value, 0);
-  const overdueCount = invoicesData.filter(inv => inv.status === "overdue").length;
-
-  // Filtra as faturas com base no status selecionado
-  const filteredInvoices = selectedStatus 
-    ? invoicesData.filter(invoice => invoice.status === selectedStatus)
-    : invoicesData;
+  const totalOverdue = filteredInvoices.filter(inv => inv.status === "overdue").reduce((sum, inv) => sum + inv.value, 0);
+  const overdueCount = filteredInvoices.filter(inv => inv.status === "overdue").length;
 
   const handleSendPaymentReminder = (invoiceId: string) => {
     // Em uma aplicação real, isso enviaria uma solicitação de API para enviar um e-mail
@@ -146,6 +155,12 @@ const Financial = () => {
       description: "Todos os clientes com faturas vencidas foram notificados.",
       duration: 5000,
     });
+  };
+
+  const handleApplyFilters = (status: InvoiceStatus | "", search: string, dueDate: string) => {
+    setSelectedStatus(status);
+    setSearchTerm(search);
+    setFilterDueDate(dueDate);
   };
 
   const handleGoToConfig = () => {
@@ -186,13 +201,22 @@ const Financial = () => {
         <FinancialFilters
           selectedStatus={selectedStatus}
           onStatusChange={setSelectedStatus}
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          dueDate={filterDueDate}
+          onDueDateChange={setFilterDueDate}
+          onApplyFilters={handleApplyFilters}
         />
         
         {/* Invoices Table */}
-        <FinancialInvoiceTable
-          invoices={filteredInvoices}
-          onSendPaymentReminder={handleSendPaymentReminder}
-        />
+        {isLoading ? (
+          <div className="py-10 text-center">Carregando faturas...</div>
+        ) : (
+          <FinancialInvoiceTable
+            invoices={filteredInvoices}
+            onSendPaymentReminder={handleSendPaymentReminder}
+          />
+        )}
       </div>
     </MainLayout>
   );

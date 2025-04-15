@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -9,18 +9,26 @@ import { InvoiceStatus } from "@/pages/Financial";
 interface FinancialFiltersProps {
   selectedStatus: InvoiceStatus | "";
   onStatusChange: (status: InvoiceStatus | "") => void;
+  searchTerm: string;
+  onSearchChange: (term: string) => void;
+  dueDate: string;
+  onDueDateChange: (date: string) => void;
+  onApplyFilters?: (status: InvoiceStatus | "", search: string, dueDate: string) => void;
 }
 
 export const FinancialFilters: React.FC<FinancialFiltersProps> = ({
   selectedStatus,
   onStatusChange,
+  searchTerm,
+  onSearchChange,
+  dueDate,
+  onDueDateChange,
+  onApplyFilters
 }) => {
-  const [searchTerm, setSearchTerm] = useState<string>('');
-  const [dueDate, setDueDate] = useState<string>('');
-
   const handleFilterApply = () => {
-    // Aqui podemos implementar a lógica adicional de filtros
-    // Por enquanto, estamos apenas usando o filtro de status diretamente
+    if (onApplyFilters) {
+      onApplyFilters(selectedStatus, searchTerm, dueDate);
+    }
     console.log("Aplicando filtros", { searchTerm, dueDate, selectedStatus });
   };
 
@@ -34,10 +42,10 @@ export const FinancialFilters: React.FC<FinancialFiltersProps> = ({
           <div className="relative">
             <Input 
               type="text" 
-              placeholder="Buscar cliente..." 
+              placeholder="Buscar cliente ou número..." 
               className="pl-9" 
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => onSearchChange(e.target.value)}
             />
             <Search className="h-4 w-4 absolute left-3 top-3 text-gray-400" />
           </div>
@@ -47,7 +55,7 @@ export const FinancialFilters: React.FC<FinancialFiltersProps> = ({
               placeholder="Data de vencimento" 
               className="w-full" 
               value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
+              onChange={(e) => onDueDateChange(e.target.value)}
             />
           </div>
           <div>
