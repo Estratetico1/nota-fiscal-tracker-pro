@@ -12,6 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { InvoiceStatus } from "@/pages/Financial";
 
 interface Invoice {
   id: string;
@@ -19,7 +20,7 @@ interface Invoice {
   invoiceNumber: string;
   value: number;
   dueDate: string;
-  status: "pending" | "paid" | "overdue";
+  status: InvoiceStatus;
 }
 
 interface FinancialInvoiceTableProps {
@@ -31,7 +32,7 @@ export const FinancialInvoiceTable: React.FC<FinancialInvoiceTableProps> = ({
   invoices,
   onSendPaymentReminder,
 }) => {
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: InvoiceStatus) => {
     switch (status) {
       case "pending":
         return <Badge className="bg-yellow-500">A Receber</Badge>;
@@ -63,58 +64,66 @@ export const FinancialInvoiceTable: React.FC<FinancialInvoiceTableProps> = ({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {invoices.map((invoice) => (
-                <TableRow 
-                  key={invoice.id}
-                  className={invoice.status === "overdue" ? "bg-red-50" : ""} // Highlight overdue rows
-                >
-                  <TableCell className="font-medium">{invoice.client}</TableCell>
-                  <TableCell>{invoice.invoiceNumber}</TableCell>
-                  <TableCell>{formatCurrency(invoice.value)}</TableCell>
-                  <TableCell>{formatDate(invoice.dueDate)}</TableCell>
-                  <TableCell>{getStatusBadge(invoice.status)}</TableCell>
-                  <TableCell>
-                    <div className="flex space-x-1">
-                      {invoice.status === "overdue" && (
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => onSendPaymentReminder(invoice.id)}
-                        >
-                          <Mail className="h-4 w-4" />
-                        </Button>
-                      )}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            Ações
+              {invoices.length > 0 ? (
+                invoices.map((invoice) => (
+                  <TableRow 
+                    key={invoice.id}
+                    className={invoice.status === "overdue" ? "bg-red-50" : ""}
+                  >
+                    <TableCell className="font-medium">{invoice.client}</TableCell>
+                    <TableCell>{invoice.invoiceNumber}</TableCell>
+                    <TableCell>{formatCurrency(invoice.value)}</TableCell>
+                    <TableCell>{formatDate(invoice.dueDate)}</TableCell>
+                    <TableCell>{getStatusBadge(invoice.status)}</TableCell>
+                    <TableCell>
+                      <div className="flex space-x-1">
+                        {invoice.status === "overdue" && (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => onSendPaymentReminder(invoice.id)}
+                          >
+                            <Mail className="h-4 w-4" />
                           </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Eye className="mr-2 h-4 w-4" />
-                            Ver detalhes
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Banknote className="mr-2 h-4 w-4" />
-                            {invoice.status === "paid" ? "Estornar" : "Marcar como pago"}
-                          </DropdownMenuItem>
-                          {invoice.status === "overdue" && (
-                            <DropdownMenuItem onClick={() => onSendPaymentReminder(invoice.id)}>
-                              <Mail className="mr-2 h-4 w-4" />
-                              Enviar cobrança
+                        )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              Ações
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>
+                              <Eye className="mr-2 h-4 w-4" />
+                              Ver detalhes
                             </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem>
-                            <Download className="mr-2 h-4 w-4" />
-                            Baixar boleto
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+                            <DropdownMenuItem>
+                              <Banknote className="mr-2 h-4 w-4" />
+                              {invoice.status === "paid" ? "Estornar" : "Marcar como pago"}
+                            </DropdownMenuItem>
+                            {invoice.status === "overdue" && (
+                              <DropdownMenuItem onClick={() => onSendPaymentReminder(invoice.id)}>
+                                <Mail className="mr-2 h-4 w-4" />
+                                Enviar cobrança
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem>
+                              <Download className="mr-2 h-4 w-4" />
+                              Baixar boleto
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-6">
+                    Nenhuma fatura encontrada.
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
         </div>

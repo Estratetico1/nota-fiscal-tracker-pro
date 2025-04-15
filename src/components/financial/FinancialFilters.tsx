@@ -4,12 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search } from "lucide-react";
-
-type InvoiceStatus = "pending" | "paid" | "overdue" | "";
+import { InvoiceStatus } from "@/pages/Financial";
 
 interface FinancialFiltersProps {
-  selectedStatus: InvoiceStatus;
-  onStatusChange: (status: InvoiceStatus) => void;
+  selectedStatus: InvoiceStatus | "";
+  onStatusChange: (status: InvoiceStatus | "") => void;
 }
 
 export const FinancialFilters: React.FC<FinancialFiltersProps> = ({
@@ -34,7 +33,7 @@ export const FinancialFilters: React.FC<FinancialFiltersProps> = ({
             <select 
               className="w-full h-10 px-3 rounded-md border border-input bg-background"
               value={selectedStatus}
-              onChange={(e) => onStatusChange(e.target.value as InvoiceStatus)}
+              onChange={(e) => onStatusChange(e.target.value as InvoiceStatus | "")}
             >
               <option value="">Todos os status</option>
               <option value="pending">A Receber</option>

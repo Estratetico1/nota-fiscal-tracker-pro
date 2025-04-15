@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
@@ -7,9 +7,10 @@ import { useNavigate } from "react-router-dom";
 import { FinancialSummary } from "@/components/financial/FinancialSummary";
 import { FinancialFilters } from "@/components/financial/FinancialFilters";
 import { FinancialInvoiceTable } from "@/components/financial/FinancialInvoiceTable";
+import { supabase } from "@/integrations/supabase/client";
 
-// Define the Invoice type to match what FinancialInvoiceTable expects
-type InvoiceStatus = "pending" | "paid" | "overdue";
+// Define o tipo InvoiceStatus para ser usado em todo o componente
+export type InvoiceStatus = "pending" | "paid" | "overdue";
 
 interface Invoice {
   id: string;
@@ -20,62 +21,66 @@ interface Invoice {
   status: InvoiceStatus;
 }
 
-const invoicesData: Invoice[] = [
-  {
-    id: "INV001",
-    client: "Farmácia Santa Maria",
-    invoiceNumber: "NF-e 12345",
-    value: 2850.75,
-    dueDate: "2025-04-25",
-    status: "pending",
-  },
-  {
-    id: "INV002",
-    client: "Drogaria São Paulo",
-    invoiceNumber: "NF-e 12346",
-    value: 1250.50,
-    dueDate: "2025-04-18",
-    status: "paid",
-  },
-  {
-    id: "INV003",
-    client: "Farmácia Popular",
-    invoiceNumber: "NF-e 12347",
-    value: 3620.30,
-    dueDate: "2025-04-10",
-    status: "overdue",
-  },
-  {
-    id: "INV004",
-    client: "Drogasil",
-    invoiceNumber: "NF-e 12348",
-    value: 1890.25,
-    dueDate: "2025-04-30",
-    status: "pending",
-  },
-  {
-    id: "INV005",
-    client: "Pague Menos",
-    invoiceNumber: "NF-e 12349",
-    value: 5240.00,
-    dueDate: "2025-04-12",
-    status: "overdue",
-  },
-  {
-    id: "INV006",
-    client: "Droga Raia",
-    invoiceNumber: "NF-e 12350",
-    value: 3780.45,
-    dueDate: "2025-04-22",
-    status: "paid",
-  },
-];
+// Função para mapear os dados do Supabase para o formato de Invoice
+const mapSupabaseToInvoice = (item: any): Invoice => {
+  // Determina o status com base na data de vencimento e quitação
+  let status: InvoiceStatus = "pending";
+  const currentDate = new Date();
+  const dueDate = item.data_vencimento ? new Date(item.data_vencimento) : null;
+  
+  if (item.data_quitacao) {
+    status = "paid";
+  } else if (dueDate && dueDate < currentDate) {
+    status = "overdue";
+  }
+  
+  return {
+    id: String(item.sequencial_cr || item.id || `INV${Math.floor(Math.random() * 10000)}`),
+    client: item.nome_fornecedor || "Cliente não especificado",
+    invoiceNumber: item.num_documento || item.num_nf ? `NF-e ${item.num_nf || item.num_documento}` : "Sem número",
+    value: Number(item.valor_parcela) || 0,
+    dueDate: item.data_vencimento || new Date().toISOString().split('T')[0],
+    status: status
+  };
+};
 
 const Financial = () => {
   const navigate = useNavigate();
   const [selectedStatus, setSelectedStatus] = useState<InvoiceStatus | "">("");
+  const [invoicesData, setInvoicesData] = useState<Invoice[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   
-  // Calculate summary values
+  // Busca os dados do Supabase
+  useEffect(() => {
+    async function fetchInvoices() {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from("contas_receber")
+          .select("*");
+        
+        if (error) {
+          console.error("Erro ao buscar dados:", error);
+          toast.error("Erro ao carregar faturas", {
+            description: "Não foi possível conectar ao banco de dados."
+          });
+        } else {
+          // Converte os dados para o formato de Invoice
+          const mappedInvoices = data.map(mapSupabaseToInvoice);
+          setInvoicesData(mappedInvoices);
+          console.log("Dados carregados:", mappedInvoices);
+        }
+      } catch (error) {
+        console.error("Erro na requisição:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    
+    fetchInvoices();
+  }, []);
+  
+  // Calcula os valores de resumo
   const totalPending = invoicesData.filter(inv => inv.status === "pending").reduce((sum, inv) => sum + inv.value, 0);
   const pendingCount = invoicesData.filter(inv => inv.status === "pending").length;
   
@@ -85,13 +90,13 @@ const Financial = () => {
   const totalOverdue = invoicesData.filter(inv => inv.status === "overdue").reduce((sum, inv) => sum + inv.value, 0);
   const overdueCount = invoicesData.filter(inv => inv.status === "overdue").length;
 
-  // Filter invoices based on the selected status
+  // Filtra as faturas com base no status selecionado
   const filteredInvoices = selectedStatus 
     ? invoicesData.filter(invoice => invoice.status === selectedStatus)
     : invoicesData;
 
   const handleSendPaymentReminder = (invoiceId: string) => {
-    // In a real application, this would send an API request to send an email
+    // Em uma aplicação real, isso enviaria uma solicitação de API para enviar um e-mail
     const invoice = invoicesData.find(inv => inv.id === invoiceId);
     toast.success(`Lembrete de pagamento enviado para ${invoice?.client}`, {
       description: `Referente à fatura ${invoice?.invoiceNumber}`,
