@@ -8,7 +8,19 @@ import { FinancialSummary } from "@/components/financial/FinancialSummary";
 import { FinancialFilters } from "@/components/financial/FinancialFilters";
 import { FinancialInvoiceTable } from "@/components/financial/FinancialInvoiceTable";
 
-const invoicesData = [
+// Define the Invoice type to match what FinancialInvoiceTable expects
+type InvoiceStatus = "pending" | "paid" | "overdue";
+
+interface Invoice {
+  id: string;
+  client: string;
+  invoiceNumber: string;
+  value: number;
+  dueDate: string;
+  status: InvoiceStatus;
+}
+
+const invoicesData: Invoice[] = [
   {
     id: "INV001",
     client: "Farmácia Santa Maria",
@@ -61,7 +73,7 @@ const invoicesData = [
 
 const Financial = () => {
   const navigate = useNavigate();
-  const [selectedStatus, setSelectedStatus] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState<InvoiceStatus | "">("");
   
   // Calculate summary values
   const totalPending = invoicesData.filter(inv => inv.status === "pending").reduce((sum, inv) => sum + inv.value, 0);
