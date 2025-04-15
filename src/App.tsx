@@ -15,6 +15,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Settings from "./pages/Settings";
 import InvoiceRouting from "./pages/InvoiceRouting";
+import Index from "./pages/Index";
 
 const queryClient = new QueryClient();
 
@@ -28,6 +29,7 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/" element={<Dashboard />} />
+          <Route path="/home" element={<Index />} />
           <Route path="/invoices" element={<InvoiceList />} />
           <Route path="/invoices/:id" element={<InvoiceDetail />} />
           <Route path="/import" element={<ImportInvoice />} />
