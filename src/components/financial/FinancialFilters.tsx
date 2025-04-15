@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,15 @@ export const FinancialFilters: React.FC<FinancialFiltersProps> = ({
   selectedStatus,
   onStatusChange,
 }) => {
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [dueDate, setDueDate] = useState<string>('');
+
+  const handleFilterApply = () => {
+    // Aqui podemos implementar a lógica adicional de filtros
+    // Por enquanto, estamos apenas usando o filtro de status diretamente
+    console.log("Aplicando filtros", { searchTerm, dueDate, selectedStatus });
+  };
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -23,11 +32,23 @@ export const FinancialFilters: React.FC<FinancialFiltersProps> = ({
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="relative">
-            <Input type="text" placeholder="Buscar cliente..." className="pl-9" />
+            <Input 
+              type="text" 
+              placeholder="Buscar cliente..." 
+              className="pl-9" 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
             <Search className="h-4 w-4 absolute left-3 top-3 text-gray-400" />
           </div>
           <div>
-            <Input type="date" placeholder="Data de vencimento" className="w-full" />
+            <Input 
+              type="date" 
+              placeholder="Data de vencimento" 
+              className="w-full" 
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+            />
           </div>
           <div>
             <select 
@@ -42,7 +63,7 @@ export const FinancialFilters: React.FC<FinancialFiltersProps> = ({
             </select>
           </div>
           <div>
-            <Button className="w-full">Filtrar</Button>
+            <Button className="w-full" onClick={handleFilterApply}>Filtrar</Button>
           </div>
         </div>
       </CardContent>

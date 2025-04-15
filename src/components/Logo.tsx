@@ -9,10 +9,10 @@ const Logo: React.FC = () => {
         <div className="absolute w-8 h-14 rounded-full border-[3px] border-teal-500"></div>
         
         {/* Linha laranja horizontal no meio */}
-        <div className="absolute top-6 left-0 w-8 h-1 bg-orange-500"></div>
+        <div className="absolute top-7 left-0 w-8 h-1 bg-orange-500"></div>
         
         {/* Área preenchida abaixo da linha laranja */}
-        <div className="absolute top-7 left-0 w-8 h-7 rounded-b-full bg-orange-100"></div>
+        <div className="absolute top-8 left-0 w-8 h-6 rounded-b-full bg-orange-100"></div>
       </div>
       <div className="text-2xl font-bold">
         <span className="text-teal-500">três</span>

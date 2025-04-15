@@ -36,9 +36,9 @@ const mapSupabaseToInvoice = (item: any): Invoice => {
   
   return {
     id: String(item.sequencial_cr || item.id || `INV${Math.floor(Math.random() * 10000)}`),
-    client: item.nome_fornecedor || "Cliente não especificado",
-    invoiceNumber: item.num_documento || item.num_nf ? `NF-e ${item.num_nf || item.num_documento}` : "Sem número",
-    value: Number(item.valor_parcela) || 0,
+    client: item.nome_fornecedor || item.cliente || "Cliente não especificado",
+    invoiceNumber: item.num_nf ? `NF-e ${item.num_nf}` : item.numero_nf ? `NF-e ${item.numero_nf}` : "Sem número",
+    value: Number(item.valor_parcela || item.valor_total) || 0,
     dueDate: item.data_vencimento || new Date().toISOString().split('T')[0],
     status: status
   };
@@ -52,32 +52,68 @@ const Financial = () => {
   
   // Busca os dados do Supabase
   useEffect(() => {
-    async function fetchInvoices() {
+    async function fetchData() {
       setIsLoading(true);
+      let allInvoices: Invoice[] = [];
+      
       try {
-        const { data, error } = await supabase
+        // Buscar dados de contas_receber
+        const { data: contasReceberData, error: contasReceberError } = await supabase
           .from("contas_receber")
           .select("*");
         
-        if (error) {
-          console.error("Erro ao buscar dados:", error);
-          toast.error("Erro ao carregar faturas", {
+        if (contasReceberError) {
+          console.error("Erro ao buscar dados de contas a receber:", contasReceberError);
+          toast.error("Erro ao carregar contas a receber", {
             description: "Não foi possível conectar ao banco de dados."
           });
-        } else {
-          // Converte os dados para o formato de Invoice
-          const mappedInvoices = data.map(mapSupabaseToInvoice);
-          setInvoicesData(mappedInvoices);
-          console.log("Dados carregados:", mappedInvoices);
+        } else if (contasReceberData) {
+          // Converter os dados para o formato de Invoice
+          const mappedContasReceber = contasReceberData.map(mapSupabaseToInvoice);
+          allInvoices = [...allInvoices, ...mappedContasReceber];
+          console.log("Dados de contas a receber carregados:", mappedContasReceber.length);
         }
+
+        // Buscar dados de notas_fiscais
+        const { data: notasFiscaisData, error: notasFiscaisError } = await supabase
+          .from("notas_fiscais")
+          .select("*");
+        
+        if (notasFiscaisError) {
+          console.error("Erro ao buscar notas fiscais:", notasFiscaisError);
+          toast.error("Erro ao carregar notas fiscais", {
+            description: "Não foi possível conectar ao banco de dados."
+          });
+        } else if (notasFiscaisData) {
+          // Verificar quais notas fiscais já existem em contas_receber para evitar duplicidade
+          const existingInvoiceNumbers = new Set(allInvoices.map(inv => inv.invoiceNumber.replace('NF-e ', '')));
+          
+          // Filtrar apenas notas que ainda não estão em contas_receber
+          const uniqueNotasFiscais = notasFiscaisData.filter(nota => {
+            const notaNumber = nota.numero_nf || '';
+            return !existingInvoiceNumbers.has(notaNumber);
+          });
+          
+          // Converter os dados para o formato de Invoice
+          const mappedNotasFiscais = uniqueNotasFiscais.map(mapSupabaseToInvoice);
+          allInvoices = [...allInvoices, ...mappedNotasFiscais];
+          console.log("Dados de notas fiscais carregados:", mappedNotasFiscais.length);
+        }
+
+        // Atualizar o estado com todos os dados combinados
+        setInvoicesData(allInvoices);
+        console.log("Total de faturas carregadas:", allInvoices.length);
       } catch (error) {
         console.error("Erro na requisição:", error);
+        toast.error("Erro ao carregar dados", {
+          description: "Ocorreu um erro inesperado."
+        });
       } finally {
         setIsLoading(false);
       }
     }
     
-    fetchInvoices();
+    fetchData();
   }, []);
   
   // Calcula os valores de resumo

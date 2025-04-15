@@ -1,90 +1,116 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layouts/MainLayout";
 import { InvoiceTable } from "@/components/dashboard/InvoiceTable";
-import {
-  Card,
-  CardContent,
-} from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Card, CardContent } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { Search, Upload, Filter, FileText, Download } from "lucide-react";
+import { Search, Upload, Filter, Download } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/components/ui/sonner";
 
-// Mock data - same as Dashboard for now
-const invoices = [
-  {
-    id: "1",
-    number: "NF-e 1234",
-    client: "Farmácia São Paulo",
-    issueDate: "15/04/2023",
-    dueDate: "15/05/2023",
-    value: 5678.90,
-    status: "delivered" as const,
-    paymentStatus: "paid" as const
-  },
-  {
-    id: "2",
-    number: "NF-e 1235",
-    client: "Drogaria Modelo",
-    issueDate: "16/04/2023",
-    dueDate: "16/05/2023",
-    value: 3421.50,
-    status: "in-transit" as const,
-    paymentStatus: "pending" as const
-  },
-  {
-    id: "3",
-    number: "NF-e 1236",
-    client: "Farmácia Central",
-    issueDate: "17/04/2023",
-    dueDate: "17/04/2023",
-    value: 1892.75,
-    status: "issue" as const,
-    paymentStatus: "overdue" as const
-  },
-  {
-    id: "4",
-    number: "NF-e 1237",
-    client: "Distribuidora Saúde",
-    issueDate: "18/04/2023",
-    dueDate: "18/05/2023",
-    value: 7634.20,
-    status: "pending" as const,
-    paymentStatus: "pending" as const
-  },
-  {
-    id: "5",
-    number: "NF-e 1238",
-    client: "Farmácia Popular",
-    issueDate: "19/04/2023",
-    dueDate: "19/05/2023",
-    value: 4567.30,
-    status: "delivered" as const,
-    paymentStatus: "paid" as const
-  },
-  {
-    id: "6",
-    number: "NF-e 1239",
-    client: "Drogaria Bem Estar",
-    issueDate: "20/04/2023",
-    dueDate: "20/05/2023",
-    value: 2987.45,
-    status: "in-transit" as const,
-    paymentStatus: "pending" as const
-  },
-];
+// Define tipos para os dados
+type InvoiceStatus = "pending" | "in-transit" | "delivered" | "issue";
+type PaymentStatus = "pending" | "paid" | "overdue";
+
+interface Invoice {
+  id: string;
+  number: string;
+  client: string;
+  issueDate: string;
+  dueDate: string;
+  value: number;
+  status: InvoiceStatus;
+  paymentStatus: PaymentStatus;
+}
 
 const InvoiceList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [deliveryStatus, setDeliveryStatus] = useState("all");
+  const [paymentStatus, setPaymentStatus] = useState("all");
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchInvoices = async () => {
+      setIsLoading(true);
+      try {
+        const { data: notasFiscais, error } = await supabase
+          .from("notas_fiscais")
+          .select("*");
+
+        if (error) {
+          console.error("Erro ao buscar notas fiscais:", error);
+          toast.error("Erro ao carregar notas fiscais");
+          return;
+        }
+
+        // Mapear os dados para o formato de Invoice
+        const mappedInvoices: Invoice[] = (notasFiscais || []).map((nota: any) => {
+          // Determinar status de entrega
+          let status: InvoiceStatus = "pending";
+          if (nota.status_entrega === "entregue") {
+            status = "delivered";
+          } else if (nota.status_entrega === "em_transito") {
+            status = "in-transit";
+          } else if (nota.status_entrega === "problema") {
+            status = "issue";
+          }
+          
+          // Determinar status de pagamento (simulado com base na data de emissão)
+          let paymentStatus: PaymentStatus = "pending";
+          if (nota.data_emissao) {
+            const emissionDate = new Date(nota.data_emissao);
+            const currentDate = new Date();
+            const diffTime = currentDate.getTime() - emissionDate.getTime();
+            const diffDays = diffTime / (1000 * 3600 * 24);
+
+            if (diffDays > 30) {
+              paymentStatus = "overdue";
+            } else if (diffDays > 15) {
+              paymentStatus = "paid";
+            }
+          }
+
+          return {
+            id: String(nota.id),
+            number: nota.numero_nf ? `NF-e ${nota.numero_nf}` : "Sem número",
+            client: nota.cliente || "Cliente não especificado",
+            issueDate: nota.data_emissao || "-",
+            dueDate: nota.data_emissao ? new Date(new Date(nota.data_emissao).getTime() + 30*24*60*60*1000).toISOString().split('T')[0] : "-",
+            value: Number(nota.valor_total) || 0,
+            status: status,
+            paymentStatus: paymentStatus
+          };
+        });
+
+        console.log("Notas fiscais carregadas:", mappedInvoices.length);
+        setInvoices(mappedInvoices);
+      } catch (error) {
+        console.error("Erro ao buscar dados:", error);
+        toast.error("Erro ao carregar dados");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchInvoices();
+  }, []);
+
+  // Filtragem de notas fiscais
+  const filteredInvoices = invoices.filter(invoice => {
+    const matchesSearch = searchTerm === "" || 
+      invoice.client.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      invoice.number.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesDeliveryStatus = deliveryStatus === "all" || invoice.status === deliveryStatus;
+    const matchesPaymentStatus = paymentStatus === "all" || invoice.paymentStatus === paymentStatus;
+    
+    return matchesSearch && matchesDeliveryStatus && matchesPaymentStatus;
+  });
 
   const handleViewInvoice = (id: string) => {
     navigate(`/invoices/${id}`);
@@ -125,7 +151,7 @@ const InvoiceList: React.FC = () => {
                 </div>
               </div>
               <div>
-                <Select defaultValue="delivery-status">
+                <Select value={deliveryStatus} onValueChange={setDeliveryStatus}>
                   <SelectTrigger>
                     <SelectValue placeholder="Status de Entrega" />
                   </SelectTrigger>
@@ -139,7 +165,7 @@ const InvoiceList: React.FC = () => {
                 </Select>
               </div>
               <div>
-                <Select defaultValue="payment-status">
+                <Select value={paymentStatus} onValueChange={setPaymentStatus}>
                   <SelectTrigger>
                     <SelectValue placeholder="Status de Pagamento" />
                   </SelectTrigger>
@@ -159,24 +185,30 @@ const InvoiceList: React.FC = () => {
               </div>
             </div>
 
-            <InvoiceTable 
-              invoices={invoices}
-              onViewInvoice={handleViewInvoice}
-            />
-            
-            <div className="mt-4 flex justify-between items-center text-sm text-gray-500">
-              <div>
-                Mostrando 1-{invoices.length} de {invoices.length} notas
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" disabled>
-                  Anterior
-                </Button>
-                <Button variant="outline" size="sm" disabled>
-                  Próxima
-                </Button>
-              </div>
-            </div>
+            {isLoading ? (
+              <div className="py-10 text-center">Carregando notas fiscais...</div>
+            ) : (
+              <>
+                <InvoiceTable 
+                  invoices={filteredInvoices}
+                  onViewInvoice={handleViewInvoice}
+                />
+                
+                <div className="mt-4 flex justify-between items-center text-sm text-gray-500">
+                  <div>
+                    Mostrando 1-{filteredInvoices.length} de {filteredInvoices.length} notas
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" disabled>
+                      Anterior
+                    </Button>
+                    <Button variant="outline" size="sm" disabled>
+                      Próxima
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
