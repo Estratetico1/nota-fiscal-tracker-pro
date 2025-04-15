@@ -1,6 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { InvoiceStatus } from "@/types/financial";
+import { InvoiceStatus, SupabaseInvoice } from "@/types/financial";
 
 export interface Invoice {
   id: string;
@@ -76,7 +76,42 @@ export const fetchInvoiceData = async (): Promise<Invoice[]> => {
       console.log("Dados de contas a receber carregados:", mappedContasReceber.length);
     }
     
+    // Fetch data from notas_fiscais
+    const { data: notasFiscaisData, error: notasFiscaisError } = await supabase
+      .from("notas_fiscais")
+      .select("*");
+    
+    if (notasFiscaisError) {
+      console.error("Erro ao buscar notas fiscais:", notasFiscaisError);
+      throw new Error("Erro ao carregar notas fiscais");
+    } else if (notasFiscaisData) {
+      // Convert the data to Invoice format
+      const mappedNotasFiscais = notasFiscaisData.map(item => mapSupabaseToInvoice(item, 'notas_fiscais'));
+      allInvoices = [...allInvoices, ...mappedNotasFiscais];
+      console.log("Notas fiscais carregadas:", mappedNotasFiscais.length);
+    }
+    
     return allInvoices;
+  } catch (error) {
+    console.error("Erro na requisição:", error);
+    throw new Error("Erro ao carregar dados");
+  }
+};
+
+// Fetch only notas fiscais data from Supabase
+export const fetchNotasFiscaisData = async (): Promise<SupabaseInvoice[]> => {
+  try {
+    const { data, error } = await supabase
+      .from("notas_fiscais")
+      .select("*");
+    
+    if (error) {
+      console.error("Erro ao buscar notas fiscais:", error);
+      throw new Error("Erro ao carregar notas fiscais");
+    }
+    
+    console.log("Notas fiscais carregadas:", data ? data.length : 0);
+    return data as SupabaseInvoice[] || [];
   } catch (error) {
     console.error("Erro na requisição:", error);
     throw new Error("Erro ao carregar dados");
