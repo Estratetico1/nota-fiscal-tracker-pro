@@ -14,12 +14,16 @@ import {
   PackageOpen, 
   TruckIcon, 
   CheckCircle, 
-  AlertTriangle 
+  AlertTriangle,
+  Filter
 } from "lucide-react";
 import { InvoiceStatus, InvoiceType } from "@/types/invoice";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface Invoice {
   id: number;
@@ -33,16 +37,25 @@ interface Invoice {
   uf: string | null;
   valor_frete: number | null;
   regiao: string | null;
+  numero_cte: string | null;
+  cod_cliente: string | null;
+  codigo_cliente: string | null;
+  frete: number | null;
+  perc_frete: number | null;
+  cmv_total: number | null;
+  data_ultima_atualizacao: string | null;
 }
 
 const InvoiceList = () => {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("");
-  const [invoiceType, setInvoiceType] = useState<string>("");
+  const [region, setRegion] = useState<string>("");
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [uniqueRegions, setUniqueRegions] = useState<string[]>([]);
+  const [uniqueStatuses, setUniqueStatuses] = useState<string[]>([]);
   
   const { toast } = useToast();
   
@@ -57,6 +70,13 @@ const InvoiceList = () => {
         if (error) throw error;
         
         setInvoices(data || []);
+
+        // Extract unique regions and statuses for filters
+        const regions = [...new Set(data?.map(item => item.regiao).filter(Boolean) || [])];
+        setUniqueRegions(regions as string[]);
+
+        const statuses = [...new Set(data?.map(item => item.status_entrega).filter(Boolean) || [])];
+        setUniqueStatuses(statuses as string[]);
       } catch (error: any) {
         toast({
           variant: "destructive",
@@ -71,16 +91,27 @@ const InvoiceList = () => {
     fetchInvoices();
   }, []);
   
-  // Filter invoices based on search, status, and type
+  // Filter invoices based on search, status, and region
   const filteredInvoices = invoices.filter(invoice => {
     return (
       (search === "" || 
        (invoice.numero_nf && invoice.numero_nf.toLowerCase().includes(search.toLowerCase())) || 
        (invoice.cliente && invoice.cliente.toLowerCase().includes(search.toLowerCase()))
       ) &&
-      (status === "" || (invoice.status_entrega && invoice.status_entrega.toLowerCase() === status.toLowerCase()))
+      (status === "" || (invoice.status_entrega && invoice.status_entrega.toLowerCase() === status.toLowerCase())) &&
+      (region === "" || (invoice.regiao && invoice.regiao.toLowerCase() === region.toLowerCase()))
     );
   });
+
+  // Format date to Brazilian format
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return '-';
+    try {
+      return format(new Date(dateString), 'dd/MM/yyyy', { locale: ptBR });
+    } catch (error) {
+      return dateString;
+    }
+  };
 
   // Status badge styling
   const getStatusBadge = (status: string | null) => {
@@ -141,21 +172,56 @@ const InvoiceList = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:w-1/2">
                 <Select value={status} onValueChange={setStatus}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Status" />
+                    <SelectValue placeholder="Status de Entrega" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="">Todos</SelectItem>
-                    <SelectItem value="pendente">Pendente</SelectItem>
-                    <SelectItem value="em trânsito">Em Trânsito</SelectItem>
-                    <SelectItem value="entregue">Entregue</SelectItem>
-                    <SelectItem value="cancelada">Cancelada</SelectItem>
+                    {uniqueStatuses.map((statusOption) => (
+                      <SelectItem key={statusOption} value={statusOption}>
+                        {statusOption}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={region} onValueChange={setRegion}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Região" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Todas</SelectItem>
+                    {uniqueRegions.map((regionOption) => (
+                      <SelectItem key={regionOption} value={regionOption}>
+                        {regionOption}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 
-                <Button variant="outline" className="flex items-center">
-                  <Calendar className="mr-2 h-4 w-4" />
-                  Período
-                </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="flex items-center">
+                      <Calendar className="mr-2 h-4 w-4" />
+                      Período
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 p-4">
+                    <div className="flex flex-col gap-2">
+                      <h4 className="font-medium">Selecionar período</h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <p className="text-sm text-muted-foreground mb-1">Data inicial</p>
+                          <Input type="date" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground mb-1">Data final</p>
+                          <Input type="date" />
+                        </div>
+                      </div>
+                      <Button className="mt-2">Aplicar</Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
           </CardContent>
@@ -180,6 +246,7 @@ const InvoiceList = () => {
                     <TableHead>Emissão</TableHead>
                     <TableHead>Valor</TableHead>
                     <TableHead>Status Entrega</TableHead>
+                    <TableHead>Região</TableHead>
                     <TableHead>UF</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
@@ -187,13 +254,13 @@ const InvoiceList = () => {
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                      <TableCell colSpan={8} className="text-center py-8 text-gray-500">
                         Carregando notas fiscais...
                       </TableCell>
                     </TableRow>
                   ) : filteredInvoices.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                      <TableCell colSpan={8} className="text-center py-8 text-gray-500">
                         Nenhuma nota fiscal encontrada
                       </TableCell>
                     </TableRow>
@@ -202,9 +269,10 @@ const InvoiceList = () => {
                       <TableRow key={invoice.id}>
                         <TableCell className="font-medium">{invoice.numero_nf}</TableCell>
                         <TableCell>{invoice.cliente}</TableCell>
-                        <TableCell>{invoice.data_emissao ? new Date(invoice.data_emissao).toLocaleDateString('pt-BR') : '-'}</TableCell>
+                        <TableCell>{formatDate(invoice.data_emissao)}</TableCell>
                         <TableCell>R$ {invoice.valor_total?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '-'}</TableCell>
                         <TableCell>{getStatusBadge(invoice.status_entrega)}</TableCell>
+                        <TableCell>{invoice.regiao || '-'}</TableCell>
                         <TableCell>{invoice.uf || '-'}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
@@ -233,7 +301,7 @@ const InvoiceList = () => {
 
       {/* Invoice Details Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Detalhes da Nota Fiscal</DialogTitle>
             <DialogDescription>
@@ -241,70 +309,129 @@ const InvoiceList = () => {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <h3 className="text-sm font-medium text-gray-500 mb-1">Cliente</h3>
-              <p className="text-lg font-semibold">{selectedInvoice?.cliente || '-'}</p>
-            </div>
-            
-            <div>
-              <h3 className="text-sm font-medium text-gray-500 mb-1">Data de Emissão</h3>
-              <p className="text-lg font-semibold">
-                {selectedInvoice?.data_emissao 
-                  ? new Date(selectedInvoice.data_emissao).toLocaleDateString('pt-BR') 
-                  : '-'
-                }
-              </p>
-            </div>
-            
-            <div>
-              <h3 className="text-sm font-medium text-gray-500 mb-1">Valor Total</h3>
-              <p className="text-lg font-semibold text-trespharma-teal">
-                R$ {selectedInvoice?.valor_total?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '-'}
-              </p>
-            </div>
-            
-            <div>
-              <h3 className="text-sm font-medium text-gray-500 mb-1">Valor do Frete</h3>
-              <p className="text-lg font-semibold">
-                R$ {selectedInvoice?.valor_frete?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '-'}
-              </p>
-            </div>
-            
-            <div>
-              <h3 className="text-sm font-medium text-gray-500 mb-1">Status de Entrega</h3>
-              <p className="text-lg">
-                {selectedInvoice?.status_entrega 
-                  ? getStatusBadge(selectedInvoice.status_entrega) 
-                  : <span className="text-gray-500">Não informado</span>
-                }
-              </p>
-            </div>
-            
-            <div>
-              <h3 className="text-sm font-medium text-gray-500 mb-1">Transportadora</h3>
-              <p className="text-lg font-semibold">{selectedInvoice?.transportadora || '-'}</p>
-            </div>
-            
-            <div className="md:col-span-2">
-              <h3 className="text-sm font-medium text-gray-500 mb-1">Localização</h3>
-              <p className="text-lg font-semibold">
-                {selectedInvoice?.cidade && selectedInvoice?.uf 
-                  ? `${selectedInvoice.cidade} - ${selectedInvoice.uf}` 
-                  : '-'
-                }
-              </p>
-              <p className="text-sm text-gray-500">{selectedInvoice?.regiao || ''}</p>
-            </div>
-            
-            <div className="md:col-span-2 mt-4">
-              <div className="flex justify-end gap-3">
-                <Button variant="outline">Fazer Download</Button>
-                <Button className="bg-trespharma-teal hover:bg-trespharma-teal/90">
-                  Solicitar Segunda Via
-                </Button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-1">Informações Gerais</h3>
+                <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                  <div>
+                    <p className="text-xs text-gray-500">Número da NF</p>
+                    <p className="font-semibold">{selectedInvoice?.numero_nf || '-'}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-xs text-gray-500">Cliente</p>
+                    <p className="font-semibold">{selectedInvoice?.cliente || '-'}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-xs text-gray-500">Código do Cliente</p>
+                    <p className="font-semibold">{selectedInvoice?.codigo_cliente || selectedInvoice?.cod_cliente || '-'}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-xs text-gray-500">Data de Emissão</p>
+                    <p className="font-semibold">{formatDate(selectedInvoice?.data_emissao)}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-xs text-gray-500">Última Atualização</p>
+                    <p className="font-semibold">{selectedInvoice?.data_ultima_atualizacao ? formatDate(selectedInvoice.data_ultima_atualizacao) : '-'}</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-1">Valores</h3>
+                <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                  <div>
+                    <p className="text-xs text-gray-500">Valor Total</p>
+                    <p className="text-lg font-bold text-green-700">
+                      R$ {selectedInvoice?.valor_total?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '-'}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-xs text-gray-500">Custo das Mercadorias Vendidas (CMV)</p>
+                    <p className="font-semibold">
+                      R$ {selectedInvoice?.cmv_total?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '-'}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
+            
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-1">Informações de Entrega</h3>
+                <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                  <div>
+                    <p className="text-xs text-gray-500">Status de Entrega</p>
+                    <div className="mt-1">
+                      {selectedInvoice?.status_entrega 
+                        ? getStatusBadge(selectedInvoice.status_entrega) 
+                        : <span className="text-gray-500">Não informado</span>
+                      }
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <p className="text-xs text-gray-500">Transportadora</p>
+                    <p className="font-semibold">{selectedInvoice?.transportadora || '-'}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-xs text-gray-500">Número do CT-e</p>
+                    <p className="font-semibold">{selectedInvoice?.numero_cte || '-'}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-xs text-gray-500">Localização</p>
+                    <p className="font-semibold">
+                      {selectedInvoice?.cidade && selectedInvoice?.uf 
+                        ? `${selectedInvoice.cidade} - ${selectedInvoice.uf}` 
+                        : '-'
+                      }
+                    </p>
+                    <p className="text-sm text-gray-500">{selectedInvoice?.regiao || ''}</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-1">Informações de Frete</h3>
+                <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                  <div>
+                    <p className="text-xs text-gray-500">Valor do Frete</p>
+                    <p className="font-semibold">
+                      R$ {selectedInvoice?.valor_frete?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '-'}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-xs text-gray-500">Frete</p>
+                    <p className="font-semibold">
+                      R$ {selectedInvoice?.frete?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '-'}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-xs text-gray-500">Percentual de Frete</p>
+                    <p className="font-semibold">
+                      {selectedInvoice?.perc_frete ? `${selectedInvoice.perc_frete}%` : '-'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="mt-6 flex justify-end gap-3">
+            <Button variant="outline">Fazer Download</Button>
+            <Button variant="outline">Ver XML</Button>
+            <Button className="bg-trespharma-teal hover:bg-trespharma-teal/90">
+              Solicitar Segunda Via
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -313,3 +440,4 @@ const InvoiceList = () => {
 };
 
 export default InvoiceList;
+
