@@ -1,56 +1,117 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Search, FileDown, Eye, Calendar } from "lucide-react";
+import { 
+  Search, 
+  FileDown, 
+  Eye, 
+  Calendar, 
+  PackageOpen, 
+  TruckIcon, 
+  CheckCircle, 
+  AlertTriangle 
+} from "lucide-react";
 import { InvoiceStatus, InvoiceType } from "@/types/invoice";
+import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-// Mock invoices data
-const invoicesData = [
-  { id: "1", number: "NF-1240", issueDate: "2023-04-20", dueDate: "2023-05-20", value: 3450.75, status: "pending" as InvoiceStatus, type: "NFe" as InvoiceType, cnpj: "12.345.678/0001-99" },
-  { id: "2", number: "NF-1239", issueDate: "2023-04-15", dueDate: "2023-05-15", value: 1250.00, status: "paid" as InvoiceStatus, type: "NFe" as InvoiceType, cnpj: "12.345.678/0001-99" },
-  { id: "3", number: "NF-1238", issueDate: "2023-04-10", dueDate: "2023-05-10", value: 5800.50, status: "paid" as InvoiceStatus, type: "NFSe" as InvoiceType, cnpj: "12.345.678/0001-99" },
-  { id: "4", number: "NF-1237", issueDate: "2023-04-05", dueDate: "2023-05-05", value: 760.25, status: "paid" as InvoiceStatus, type: "NFe" as InvoiceType, cnpj: "12.345.678/0001-99" },
-  { id: "5", number: "NF-1236", issueDate: "2023-04-01", dueDate: "2023-05-01", value: 2100.00, status: "overdue" as InvoiceStatus, type: "NFe" as InvoiceType, cnpj: "12.345.678/0001-99" },
-  { id: "6", number: "NF-1235", issueDate: "2023-03-28", dueDate: "2023-04-28", value: 950.50, status: "overdue" as InvoiceStatus, type: "NFCe" as InvoiceType, cnpj: "12.345.678/0001-99" },
-  { id: "7", number: "NF-1234", issueDate: "2023-03-25", dueDate: "2023-04-25", value: 3275.00, status: "cancelled" as InvoiceStatus, type: "NFe" as InvoiceType, cnpj: "12.345.678/0001-99" },
-];
+interface Invoice {
+  id: number;
+  numero_nf: string;
+  data_emissao: string | null;
+  cliente: string | null;
+  valor_total: number | null;
+  status_entrega: string | null;
+  transportadora: string | null;
+  cidade: string | null;
+  uf: string | null;
+  valor_frete: number | null;
+  regiao: string | null;
+}
 
 const InvoiceList = () => {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("");
   const [invoiceType, setInvoiceType] = useState<string>("");
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  
+  const { toast } = useToast();
+  
+  useEffect(() => {
+    const fetchInvoices = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('notas_fiscais')
+          .select('*');
+        
+        if (error) throw error;
+        
+        setInvoices(data || []);
+      } catch (error: any) {
+        toast({
+          variant: "destructive",
+          title: "Erro ao carregar notas fiscais",
+          description: error.message || "Ocorreu um erro ao carregar as notas fiscais.",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchInvoices();
+  }, []);
   
   // Filter invoices based on search, status, and type
-  const filteredInvoices = invoicesData.filter(invoice => {
+  const filteredInvoices = invoices.filter(invoice => {
     return (
       (search === "" || 
-       invoice.number.toLowerCase().includes(search.toLowerCase()) || 
-       invoice.cnpj?.toLowerCase().includes(search.toLowerCase())
+       (invoice.numero_nf && invoice.numero_nf.toLowerCase().includes(search.toLowerCase())) || 
+       (invoice.cliente && invoice.cliente.toLowerCase().includes(search.toLowerCase()))
       ) &&
-      (status === "" || invoice.status === status) &&
-      (invoiceType === "" || invoice.type === invoiceType)
+      (status === "" || (invoice.status_entrega && invoice.status_entrega.toLowerCase() === status.toLowerCase()))
     );
   });
-  
+
   // Status badge styling
-  const getStatusBadge = (status: InvoiceStatus) => {
-    switch (status) {
-      case "paid":
-        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Paga</Badge>;
-      case "pending":
-        return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Pendente</Badge>;
-      case "overdue":
-        return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Vencida</Badge>;
-      case "cancelled":
-        return <Badge className="bg-gray-100 text-gray-800 hover:bg-gray-100">Cancelada</Badge>;
+  const getStatusBadge = (status: string | null) => {
+    if (!status) return <Badge className="bg-gray-100 text-gray-800 hover:bg-gray-100">Desconhecido</Badge>;
+    
+    switch (status.toLowerCase()) {
+      case "entregue":
+        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100 flex items-center gap-1">
+          <CheckCircle className="h-3 w-3" />
+          Entregue
+        </Badge>;
+      case "em trânsito":
+        return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 flex items-center gap-1">
+          <TruckIcon className="h-3 w-3" />
+          Em Trânsito
+        </Badge>;
+      case "pendente":
+        return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 flex items-center gap-1">
+          <AlertTriangle className="h-3 w-3" />
+          Pendente
+        </Badge>;
+      case "cancelada":
+        return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Cancelada</Badge>;
       default:
-        return <Badge>{status}</Badge>;
+        return <Badge className="bg-gray-100 text-gray-800 hover:bg-gray-100">{status}</Badge>;
     }
+  };
+
+  const viewInvoiceDetails = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setIsDialogOpen(true);
   };
 
   return (
@@ -71,7 +132,7 @@ const InvoiceList = () => {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input 
-                  placeholder="Buscar por Nº da NF ou CNPJ" 
+                  placeholder="Buscar por Nº da NF ou Cliente" 
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="pl-10"
@@ -84,22 +145,10 @@ const InvoiceList = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="">Todos</SelectItem>
-                    <SelectItem value="pending">Pendente</SelectItem>
-                    <SelectItem value="paid">Paga</SelectItem>
-                    <SelectItem value="overdue">Vencida</SelectItem>
-                    <SelectItem value="cancelled">Cancelada</SelectItem>
-                  </SelectContent>
-                </Select>
-                
-                <Select value={invoiceType} onValueChange={setInvoiceType}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Todos</SelectItem>
-                    <SelectItem value="NFe">NF-e</SelectItem>
-                    <SelectItem value="NFSe">NFS-e</SelectItem>
-                    <SelectItem value="NFCe">NFC-e</SelectItem>
+                    <SelectItem value="pendente">Pendente</SelectItem>
+                    <SelectItem value="em trânsito">Em Trânsito</SelectItem>
+                    <SelectItem value="entregue">Entregue</SelectItem>
+                    <SelectItem value="cancelada">Cancelada</SelectItem>
                   </SelectContent>
                 </Select>
                 
@@ -127,16 +176,22 @@ const InvoiceList = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Nº Nota</TableHead>
+                    <TableHead>Cliente</TableHead>
                     <TableHead>Emissão</TableHead>
-                    <TableHead>Vencimento</TableHead>
                     <TableHead>Valor</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Tipo</TableHead>
+                    <TableHead>Status Entrega</TableHead>
+                    <TableHead>UF</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredInvoices.length === 0 ? (
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                        Carregando notas fiscais...
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredInvoices.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                         Nenhuma nota fiscal encontrada
@@ -145,15 +200,20 @@ const InvoiceList = () => {
                   ) : (
                     filteredInvoices.map((invoice) => (
                       <TableRow key={invoice.id}>
-                        <TableCell className="font-medium">{invoice.number}</TableCell>
-                        <TableCell>{new Date(invoice.issueDate).toLocaleDateString('pt-BR')}</TableCell>
-                        <TableCell>{new Date(invoice.dueDate).toLocaleDateString('pt-BR')}</TableCell>
-                        <TableCell>R$ {invoice.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
-                        <TableCell>{getStatusBadge(invoice.status)}</TableCell>
-                        <TableCell>{invoice.type}</TableCell>
+                        <TableCell className="font-medium">{invoice.numero_nf}</TableCell>
+                        <TableCell>{invoice.cliente}</TableCell>
+                        <TableCell>{invoice.data_emissao ? new Date(invoice.data_emissao).toLocaleDateString('pt-BR') : '-'}</TableCell>
+                        <TableCell>R$ {invoice.valor_total?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '-'}</TableCell>
+                        <TableCell>{getStatusBadge(invoice.status_entrega)}</TableCell>
+                        <TableCell>{invoice.uf || '-'}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <Button variant="outline" size="icon" title="Visualizar">
+                            <Button 
+                              variant="outline" 
+                              size="icon" 
+                              title="Visualizar"
+                              onClick={() => viewInvoiceDetails(invoice)}
+                            >
                               <Eye className="h-4 w-4" />
                             </Button>
                             <Button variant="outline" size="icon" title="Download">
@@ -170,6 +230,84 @@ const InvoiceList = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Invoice Details Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Detalhes da Nota Fiscal</DialogTitle>
+            <DialogDescription>
+              Nota Fiscal {selectedInvoice?.numero_nf}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 mb-1">Cliente</h3>
+              <p className="text-lg font-semibold">{selectedInvoice?.cliente || '-'}</p>
+            </div>
+            
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 mb-1">Data de Emissão</h3>
+              <p className="text-lg font-semibold">
+                {selectedInvoice?.data_emissao 
+                  ? new Date(selectedInvoice.data_emissao).toLocaleDateString('pt-BR') 
+                  : '-'
+                }
+              </p>
+            </div>
+            
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 mb-1">Valor Total</h3>
+              <p className="text-lg font-semibold text-trespharma-teal">
+                R$ {selectedInvoice?.valor_total?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '-'}
+              </p>
+            </div>
+            
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 mb-1">Valor do Frete</h3>
+              <p className="text-lg font-semibold">
+                R$ {selectedInvoice?.valor_frete?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '-'}
+              </p>
+            </div>
+            
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 mb-1">Status de Entrega</h3>
+              <p className="text-lg">
+                {selectedInvoice?.status_entrega 
+                  ? getStatusBadge(selectedInvoice.status_entrega) 
+                  : <span className="text-gray-500">Não informado</span>
+                }
+              </p>
+            </div>
+            
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 mb-1">Transportadora</h3>
+              <p className="text-lg font-semibold">{selectedInvoice?.transportadora || '-'}</p>
+            </div>
+            
+            <div className="md:col-span-2">
+              <h3 className="text-sm font-medium text-gray-500 mb-1">Localização</h3>
+              <p className="text-lg font-semibold">
+                {selectedInvoice?.cidade && selectedInvoice?.uf 
+                  ? `${selectedInvoice.cidade} - ${selectedInvoice.uf}` 
+                  : '-'
+                }
+              </p>
+              <p className="text-sm text-gray-500">{selectedInvoice?.regiao || ''}</p>
+            </div>
+            
+            <div className="md:col-span-2 mt-4">
+              <div className="flex justify-end gap-3">
+                <Button variant="outline">Fazer Download</Button>
+                <Button className="bg-trespharma-teal hover:bg-trespharma-teal/90">
+                  Solicitar Segunda Via
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
