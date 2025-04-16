@@ -19,40 +19,14 @@ export default {
 		},
 		extend: {
 			colors: {
-				teal: {
-					DEFAULT: '#008599',
-					50: '#E6F7FA',
-					100: '#CCF0F5',
-					200: '#99E0EB',
-					300: '#66D1E0',
-					400: '#33C1D6',
-					500: '#008599',
-					600: '#007A8A',
-					700: '#006E7B',
-					800: '#00636D',
-					900: '#00575E',
-				},
-				orange: {
-					DEFAULT: '#F47920',
-					50: '#FEF2E8',
-					100: '#FDE6D1',
-					200: '#FBCDA3',
-					300: '#F9B475',
-					400: '#F79B47',
-					500: '#F47920',
-					600: '#E06A13',
-					700: '#C75C11',
-					800: '#AE4D0F',
-					900: '#953F0D',
-				},
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
 				ring: 'hsl(var(--ring))',
 				background: 'hsl(var(--background))',
 				foreground: 'hsl(var(--foreground))',
 				primary: {
-					DEFAULT: '#008599',
-					foreground: '#FFFFFF'
+					DEFAULT: 'hsl(var(--primary))',
+					foreground: 'hsl(var(--primary-foreground))'
 				},
 				secondary: {
 					DEFAULT: 'hsl(var(--secondary))',
